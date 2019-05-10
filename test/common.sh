@@ -92,3 +92,109 @@ function make_image {
 	SPARK_IMAGE=$SPARK_TEST_IMAGE
     fi
 }
+
+function cleanup_app {
+    oc delete dc --all > /dev/null
+    oc delete service --all > /dev/null
+    oc delete route --all > /dev/null
+    oc delete template --all > /dev/null
+    oc delete pod --all > /dev/null
+    os::cmd::try_until_text 'oc get pods' 'No resources found'
+}
+
+function make_configmap {
+    set +e
+    oc create configmap test-config --from-file=$RESOURCE_DIR/config
+    set -e
+}
+
+function poll_binary_build() {
+    local name
+    local source
+    local expect_fail
+    local from_flag=""
+    name=$1
+    if [ "$#" -ge 2 ]; then
+        source=$2
+        # We'll pass a tarball directory to test from-archive and the ability
+        # of the image to detect an unpacked directory. We'll use from-file
+        # with a directory to test the ability of the image to handle a tarball
+        if [[ "$source" == *".tgz" ]]; then
+	    from_flag="--from-archive=$source"
+        else
+	    from_flag="--from-file=$source"
+        fi
+    fi
+    if [ "$#" -eq 3 ]; then
+	expect_fail=$3
+    else
+	expect_fail=false
+    fi
+    local tries=0
+    local status
+    local BUILDNUM
+
+    echo "oc start-build $name $from_flag"
+    oc start-build $name $from_flag
+
+
+    while true; do
+        BUILDNUM=$(oc get buildconfig $name --template='{{index .status "lastVersion"}}')
+	if [ "$BUILDNUM" == "0" ]; then
+	    # Buildconfig is brand new, lastVersion hasn't been updated yet
+	    status="starting"
+	else
+            status=$(oc get build "$name"-$BUILDNUM --template="{{index .status \"phase\"}}")
+	fi
+	if [ "$status" == "starting" ]; then
+	    echo Build for $name is spinning up, waiting ...
+	    sleep 5
+	elif [ "$status" != "Complete" -a "$status" != "Failed" -a "$status" != "Error" ]; then
+	    echo Build for $name-$BUILDNUM status is $status, waiting ...
+	    sleep 10
+	elif [ "$status" == "Failed" -o "$status" == "Error" ]; then
+	    if [ "$expect_fail" == "true" ]; then
+		return
+	    fi
+	    set +e
+	    oc log buildconfig/$name | grep "Pushing image"
+	    if [ "$?" -eq 0 ]; then
+		tries=$((tries+1))
+		if [ "$tries" -lt 5 ]; then
+		    echo Build failed on push, retrying
+		    sleep 5
+		    oc start-build $name $from_flag
+		    continue
+		fi
+	    fi
+	    oc log buildconfig/$name | tail -100
+	    set -e
+	    return 1
+	else
+	    echo Build for $name-$BUILDNUM status is $status, returning
+	    break
+	fi
+    done
+}
+
+function get_cluster_pod() {
+    local count
+    count=0
+
+    set +e
+    while true; do
+        POD=$(oc get pod -l deploymentconfig=$1 --template='{{index .items 0 "metadata" "name"}}')
+        if [ "$?" -eq 0 ]; then
+            break
+        fi
+        echo Getting cluster pod for $1 failed, trying again
+        oc get pods
+        sleep 0.5
+        count=$((count + 1))
+        echo $count
+        if [ "$count" -eq 120 ]; then
+            return 1
+        fi
+    done
+    set -e
+}

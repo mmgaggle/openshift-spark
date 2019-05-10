@@ -10,7 +10,7 @@ DOCKERFILE_CONTEXT=openshift-spark-build
 OPENSHIFT_SPARK_TEST_IMAGE ?= spark-testimage
 export OPENSHIFT_SPARK_TEST_IMAGE
 
-.PHONY: build clean push create destroy test-e2e build-py build-py36
+.PHONY: build clean push create destroy test-e2e test-e2e-py test-e2e-py36 build-py build-py36 clean-target clean-context zero-tarballs
 
 build: build-py build-py36
 
@@ -43,10 +43,12 @@ destroy: template.active
 	rm template-py36.active
 
 clean-context:
-	-rm -rf target
 	-rm -rf $(DOCKERFILE_CONTEXT)/*
-	-rm -rf target-py36
 	-rm -rf $(DOCKERFILE_CONTEXT)-py36/*
+
+clean-target:
+	-rm -rf target
+	-rm -rf target-py36
 
 context: $(DOCKERFILE_CONTEXT) $(DOCKERFILE_CONTEXT)-py36
 
@@ -57,11 +59,11 @@ $(DOCKERFILE_CONTEXT)-py36: $(DOCKERFILE_CONTEXT)-py36/Dockerfile \
 							$(DOCKERFILE_CONTEXT)-py36/modules
 
 $(DOCKERFILE_CONTEXT)/Dockerfile $(DOCKERFILE_CONTEXT)/modules:
-	concreate generate --descriptor image.yaml --overrides overrides/default.yaml
+	cekit generate --descriptor image.yaml --overrides overrides/default.yaml
 	cp -R target/image/* $(DOCKERFILE_CONTEXT)
 
 $(DOCKERFILE_CONTEXT)-py36/Dockerfile $(DOCKERFILE_CONTEXT)-py36/modules:
-	concreate generate --descriptor image.yaml --overrides overrides/python36.yaml --target target-py36
+	cekit generate --descriptor image.yaml --overrides overrides/python36.yaml --target target-py36
 	cp -R target-py36/image/* $(DOCKERFILE_CONTEXT)-py36
 
 zero-tarballs:
@@ -72,13 +74,13 @@ zero-tarballs:
 
 test-e2e:
 	LOCAL_IMAGE=$(OPENSHIFT_SPARK_TEST_IMAGE) make build
-	test/run.sh
-	SPARK_TEST_IMAGE=$(OPENSHIFT_SPARK_TEST_IMAGE)-py36 test/run.sh
+	test/run.sh completed/
+	SPARK_TEST_IMAGE=$(OPENSHIFT_SPARK_TEST_IMAGE)-py36 test/run.sh completed/
 
 test-e2e-py:
 	LOCAL_IMAGE=$(OPENSHIFT_SPARK_TEST_IMAGE) make build-py
-	test/run.sh
+	test/run.sh completed/
 
 test-e2e-py36:
 	LOCAL_IMAGE=$(OPENSHIFT_SPARK_TEST_IMAGE) make build-py36
-	SPARK_TEST_IMAGE=$(OPENSHIFT_SPARK_TEST_IMAGE)-py36 test/run.sh
+	SPARK_TEST_IMAGE=$(OPENSHIFT_SPARK_TEST_IMAGE)-py36 test/run.sh completed/

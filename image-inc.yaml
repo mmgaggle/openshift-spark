@@ -1,0 +1,39 @@
+schema_version: 1
+
+version: 2.3-latest
+release: community
+name: radanalyticsio/openshift-spark-inc
+from: centos:latest
+labels:
+    - name: maintainer
+      value: Chad Roberts <croberts@redhat.com>
+    - name: sparkversion
+      value: 2.3.0
+    - name: "io.openshift.s2i.scripts-url"
+      value: "image:///usr/libexec/s2i"
+envs:
+    - name: PATH
+      value: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/spark/bin
+    - name: SPARK_HOME
+      value: /opt/spark
+    - name: SPARK_INSTALL
+      value: /opt/spark-distro
+    - name: STI_SCRIPTS_PATH
+      value: /usr/libexec/s2i
+    - name: SCL_ENABLE_CMD
+      value: ""
+modules:
+    install:
+        - name: common
+        - name: metrics
+        - name: s2i
+packages:
+    install:
+        - java-1.8.0-openjdk
+        - wget
+run:
+    user: 185
+    entrypoint:
+      - "/entrypoint"
+    cmd:
+      - "/usr/libexec/s2i/usage"
