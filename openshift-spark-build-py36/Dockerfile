@@ -16,7 +16,7 @@
 #
 # This is a Dockerfile for the radanalyticsio/openshift-spark:2.3-latest image.
 
-FROM centos:latest
+FROM registry.access.redhat.com/ubi7/ubi:latest
 
 # Environment variables
 ENV \

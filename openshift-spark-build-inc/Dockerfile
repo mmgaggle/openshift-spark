@@ -16,7 +16,7 @@
 #
 # This is a Dockerfile for the radanalyticsio/openshift-spark-inc:2.3-latest image.
 
-FROM centos:latest
+FROM registry.access.redhat.com/ubi7/ubi:latest
 
 # Environment variables
 ENV \
@@ -39,9 +39,10 @@ USER root
 
 
 # Install required RPMs and ensure that the packages were installed
-RUN yum install -y java-1.8.0-openjdk wget numpy \
+RUN yum-config-manager --enable rhel-server-rhscl-7-rpms \
+    && yum install -y java-1.8.0-openjdk wget python27-numpy \
     && yum clean all && rm -rf /var/cache/yum && \
-    rpm -q  java-1.8.0-openjdk wget numpy
+    rpm -q  java-1.8.0-openjdk wget
 
 # Add scripts used to configure the image
 COPY modules /tmp/scripts
